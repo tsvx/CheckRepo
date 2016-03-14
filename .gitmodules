@@ -1,0 +1,3 @@
+[submodule "Downloader"]
+	path = Downloader
+	url = https://github.com/tsvx/Downloader.git
