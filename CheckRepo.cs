@@ -18,10 +18,10 @@ namespace CheckRepo
 		static Dictionary<string, HashAlgorithm> algs = new Dictionary<string, HashAlgorithm>();
 		const int BufSize = 1 << 20;
 
-		static bool CheckRepo(string path)
+		static bool CheckRepo(string dir, string url)
 		{
-			Console.WriteLine("Checking repository at " + path);
-			string repomd = Path.Combine(path, "repodata", "repomd.xml");
+			Console.WriteLine("Checking repository at " + dir);
+			string repomd = Path.Combine(dir, "repodata", "repomd.xml");
 			XNamespace ns = "http://linux.duke.edu/metadata/repo";
 			var ff = from data in XDocument.Load(repomd).Element(ns + "repomd").Elements(ns + "data")
 					 let csum = data.Element(ns + "checksum")
@@ -36,7 +36,7 @@ namespace CheckRepo
 			var files = ff.ToArray();
 			foreach (var f in files)
 			{
-				string fname = Path.Combine(path, f.Name);
+				string fname = Path.Combine(dir, f.Name);
 				if (f.Size.HasValue)
 					Trace.Assert((new FileInfo(fname)).Length == f.Size);
 				string hType = f.CsumType.ToUpper();
@@ -56,7 +56,7 @@ namespace CheckRepo
 			}
 
 			var prname = files.Where(f => f.Type == "primary").Single().Name;
-			CheckList(path, prname);
+			CheckList(dir, prname);
 
 			Console.WriteLine("All is OK!");
 			return true;
@@ -135,11 +135,23 @@ namespace CheckRepo
 
 		static int Main(string[] args)
 		{
-			Console.WriteLine("Current directory is " + Environment.CurrentDirectory);
+			string repoDir = null;
+			string updateUrl = null;
+
 			if (args.Length == 0)
-				return CheckRepo(".") ? 0 : 1;
+				repoDir = ".";
 			else
-				return args.Select(s => CheckRepo(s) ? 0 : 1).Sum();
+				foreach (var s in args)
+				{
+					if (s == "-u")
+						updateUrl = "";
+					else if (updateUrl == "")
+						updateUrl = s;
+					else
+						repoDir = s;
+				}
+
+			return CheckRepo(repoDir, updateUrl) ? 0 : 1;
 		}
 	}
 }
