@@ -4,7 +4,7 @@ Verification of local RPM repos.
 ## Usage:
 
 * `CheckRepo` &ndash; checks a repo in the current directory;
-* `CheckRepo dir1 [dir2] ...` &ndash; checks repos in the given directories;
+* `CheckRepo dir` &ndash; checks repos in the given directory;
 
 ## Workflow
 
