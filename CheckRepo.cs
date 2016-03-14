@@ -18,10 +18,31 @@ namespace CheckRepo
 		static Dictionary<string, HashAlgorithm> algs = new Dictionary<string, HashAlgorithm>();
 		const int BufSize = 1 << 20;
 
+		static void DownloadProgress(long written, long total)
+		{
+			Console.WriteLine("\r{0} / {1} ({2:P})  ", written, total, (double)written/total);
+		}
+
+		static void UpdateFile(string url, string path)
+		{
+		}
+
 		static bool CheckRepo(string dir, string url)
 		{
-			Console.WriteLine("Checking repository at " + dir);
+			Console.WriteLine("Checking repository at " + dir + (Path.IsPathRooted(dir) ? "" : " (" + Path.GetFullPath(dir) + ")"));
+
+			if (url == "")
+				url = File.ReadLines(".url").First();
+			else if (url != null)
+			{
+				url = url.TrimEnd('/') + '/';
+				File.WriteAllText(".url", url);
+			}
+			Console.WriteLine("Update from " + url);
+
 			string repomd = Path.Combine(dir, "repodata", "repomd.xml");
+			if (url != null)
+				UpdateFile(url + "repodata/repomd.xml", repomd);
 			XNamespace ns = "http://linux.duke.edu/metadata/repo";
 			var ff = from data in XDocument.Load(repomd).Element(ns + "repomd").Elements(ns + "data")
 					 let csum = data.Element(ns + "checksum")
@@ -36,6 +57,7 @@ namespace CheckRepo
 			var files = ff.ToArray();
 			foreach (var f in files)
 			{
+				
 				string fname = Path.Combine(dir, f.Name);
 				if (f.Size.HasValue)
 					Trace.Assert((new FileInfo(fname)).Length == f.Size);
