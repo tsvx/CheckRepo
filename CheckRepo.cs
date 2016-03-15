@@ -118,7 +118,7 @@ namespace CheckRepo
 			return true;
 		}
 
-		static bool CheckRepo(string dir, string url)
+		static bool CheckRepo(string dir, string url, bool checkHash = true)
 		{
 			int badFiles = 0;
 			Console.WriteLine("Checking repository at " + dir + (Path.IsPathRooted(dir) ? "" : " (" + Path.GetFullPath(dir) + ")"));
@@ -189,11 +189,11 @@ namespace CheckRepo
 				return false;
 			}
 			else
-				badFiles += CheckList(url, dir, prname);
+				badFiles += CheckList(url, dir, prname, checkHash);
 			return badFiles == 0;
 		}
 
-		static int CheckList(string url, string dir, string prname)
+		static int CheckList(string url, string dir, string prname, bool checkHash = true)
 		{
 			int badFiles = 0;
 			Console.WriteLine("Checking rpm files...");
@@ -230,10 +230,13 @@ namespace CheckRepo
 		{
 			string repoDir = null;
 			string updateUrl = null;
+			bool checkHash = false;
 
 			foreach (var s in args)
 			{
-				if (s == "-u")
+				if (s == "-c")
+					checkHash = true;
+				else if (s == "-u")
 					updateUrl = "";
 				else if (updateUrl == "")
 					updateUrl = s;
@@ -243,7 +246,7 @@ namespace CheckRepo
 			if (repoDir == null)
 				repoDir = ".";
 
-			bool r = CheckRepo(repoDir, updateUrl);
+			bool r = CheckRepo(repoDir, updateUrl, checkHash);
 			if (r)
 				Console.WriteLine("The repo is OK.");
 			else
