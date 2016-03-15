@@ -53,7 +53,7 @@ namespace CheckRepo
 			return true == r;
 		}
 
-		static CheckResult CheckFile(string dir, RepoFileInfo f, ref string msg, bool checkHash = true)
+		static CheckResult CheckFile(string dir, RepoFileInfo f, ref string msg, bool checkHash)
 		{
 			string fname = Path.Combine(dir, f.Name);
 			var fi = new FileInfo(fname);
@@ -91,7 +91,7 @@ namespace CheckRepo
 			return CheckResult.OK;
 		}
 
-		static bool CheckAndUpdate(string url, string dir, RepoFileInfo f, bool checkHash = true)
+		static bool CheckAndUpdate(string url, string dir, RepoFileInfo f, bool checkHash)
 		{
 			string msg = null;
 			var r = CheckFile(dir, f, ref msg, checkHash);
@@ -109,7 +109,7 @@ namespace CheckRepo
 				Console.WriteLine("Error");
 				return false;
 			}
-			r = CheckFile(dir, f, ref msg);
+			r = CheckFile(dir, f, ref msg, checkHash);
 			if (r != CheckResult.OK)
 			{
 				Console.WriteLine(msg);
@@ -118,7 +118,7 @@ namespace CheckRepo
 			return true;
 		}
 
-		static bool CheckRepo(string dir, string url, bool checkHash = true)
+		static bool CheckRepo(string dir, string url, bool checkHash)
 		{
 			int badFiles = 0;
 			Console.WriteLine("Checking repository at " + dir + (Path.IsPathRooted(dir) ? "" : " (" + Path.GetFullPath(dir) + ")"));
@@ -168,7 +168,7 @@ namespace CheckRepo
 			string prname = null;
 			foreach (var f in ff)
 			{
-				if (!CheckAndUpdate(url, dir, f))
+				if (!CheckAndUpdate(url, dir, f, checkHash))
 				{
 					badFiles++;
 					continue;
@@ -214,7 +214,7 @@ namespace CheckRepo
 					 };
 			foreach (var f in ff)
 			{
-				if (!CheckAndUpdate(url, dir, f))
+				if (!CheckAndUpdate(url, dir, f, checkHash))
 					badFiles++;
 				else if (f.Type != "rpm")
 				{
