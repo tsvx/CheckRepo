@@ -231,18 +231,17 @@ namespace CheckRepo
 			string repoDir = null;
 			string updateUrl = null;
 
-			if (args.Length == 0)
+			foreach (var s in args)
+			{
+				if (s == "-u")
+					updateUrl = "";
+				else if (updateUrl == "")
+					updateUrl = s;
+				else
+					repoDir = s;
+			}
+			if (repoDir == null)
 				repoDir = ".";
-			else
-				foreach (var s in args)
-				{
-					if (s == "-u")
-						updateUrl = "";
-					else if (updateUrl == "")
-						updateUrl = s;
-					else
-						repoDir = s;
-				}
 
 			bool r = CheckRepo(repoDir, updateUrl);
 			if (r)
