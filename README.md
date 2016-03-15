@@ -4,14 +4,15 @@ Verification and update of local RPM repos.
 
 ## Usage:
 
-`CheckRepo [dir] [-u [url]]`
+`CheckRepo [dir] [-c] [-u [url]]`
 
 1. Checks a repo in the given or in the current directory;
-2. Update files, if flag `-u` is given. Update url, if given, is written to the file `.url`
+2. Checksum verification is performed only if the flag `-c` is specified.
+3. Update files, if flag `-u` is given. Update url, if given, is written to the file `.url`
 in the dir to be checked. Or is read from this file if it is not given.
 
 The update process tries to download `repomd.xml` (always) and each file referenced
-that is absent or having a wrong size or checksum.
+that is absent or having a wrong size or checksum (if the latter is supposed to verify).
 
 ## Workflow
 
