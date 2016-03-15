@@ -4,63 +4,71 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using System.Xml.XPath;
+using Tsul.Network;
 
 namespace CheckRepo
 {
+	public class RepoFileInfo
+	{
+		public string Type;
+		public string CsumType;
+		public string Csum;
+		public string Name;
+		public long? Size;
+	}
+
+	public enum CheckResult
+	{
+		NotExist = 0,
+		BadSize,
+		BadHash,
+		OK
+	}
+
 	class Program
 	{
 		static Dictionary<string, HashAlgorithm> algs = new Dictionary<string, HashAlgorithm>();
 		const int BufSize = 1 << 20;
+		const string MainRepoFile = "repodata/repomd.xml";
 
 		static void DownloadProgress(long written, long total)
 		{
-			Console.WriteLine("\r{0} / {1} ({2:P})  ", written, total, (double)written/total);
+			Console.Write("\r{0} / {1} ({2:P})  ", written, total, (double)written / total);
 		}
 
-		static void UpdateFile(string url, string path)
+		static bool UpdateFile(string baseUrl, string dir, string fname)
 		{
+			string fullDir = Path.GetDirectoryName( Path.Combine(dir,fname));
+			if (!Directory.Exists(fullDir))
+				Directory.CreateDirectory(fullDir);
+			bool? r = HttpUtils.DownloadFile(baseUrl + fname, dir + fname, DownloadProgress);
+			Console.WriteLine(r == true ? "OK" : r == null ? "Error" : "Fatal");
+			return true == r;
 		}
 
-		static bool CheckRepo(string dir, string url)
+		static CheckResult CheckFile(string dir, RepoFileInfo f, ref string msg, bool checkHash = true)
 		{
-			Console.WriteLine("Checking repository at " + dir + (Path.IsPathRooted(dir) ? "" : " (" + Path.GetFullPath(dir) + ")"));
-
-			if (url == "")
-				url = File.ReadLines(".url").First();
-			else if (url != null)
+			string fname = Path.Combine(dir, f.Name);
+			var fi = new FileInfo(fname);
+			if (!fi.Exists)
 			{
-				url = url.TrimEnd('/') + '/';
-				File.WriteAllText(".url", url);
+				msg = String.Format("File '{0}' does not exist.", f.Name);
+				return CheckResult.NotExist;
 			}
-			Console.WriteLine("Update from " + url);
-
-			string repomd = Path.Combine(dir, "repodata", "repomd.xml");
-			if (url != null)
-				UpdateFile(url + "repodata/repomd.xml", repomd);
-			XNamespace ns = "http://linux.duke.edu/metadata/repo";
-			var ff = from data in XDocument.Load(repomd).Element(ns + "repomd").Elements(ns + "data")
-					 let csum = data.Element(ns + "checksum")
-					 select new
-					 {
-						 Type = (string)data.Attribute("type"),
-						 CsumType = ((string)csum.Attribute("type")),
-						 Csum = (string)csum,
-						 Name = (string)data.Element(ns + "location").Attribute("href"),
-						 Size = (long?)data.Element(ns + "size")
-					 };
-			var files = ff.ToArray();
-			foreach (var f in files)
+			if (f.Size.HasValue && fi.Length != f.Size)
 			{
-				
-				string fname = Path.Combine(dir, f.Name);
-				if (f.Size.HasValue)
-					Trace.Assert((new FileInfo(fname)).Length == f.Size);
+				msg = String.Format("File '{0}' size {1} mismatches, needs {2}.", f.Name, fi.Length, f.Size);
+				return CheckResult.BadSize;
+			}
+			if (checkHash)
+			{
 				string hType = f.CsumType.ToUpper();
 				HashAlgorithm hAlg;
 				if (!algs.TryGetValue(hType, out hAlg))
@@ -74,27 +82,121 @@ namespace CheckRepo
 				string hash;
 				using (var fs = File.OpenRead(fname))
 					hash = String.Join("", hAlg.ComputeHash(fs).Select(b => b.ToString("x2")));
-				Trace.Assert(f.Csum.ToLower() == hash);
+				if (f.Csum.ToLower() != hash)
+				{
+					msg = String.Format("File '{0}' {1}-hash {2} mismatches needed {3}.", f.Name, f.CsumType, hash, f.Csum);
+					return CheckResult.BadHash;
+				}
 			}
+			return CheckResult.OK;
+		}
 
-			var prname = files.Where(f => f.Type == "primary").Single().Name;
-			CheckList(dir, prname);
-
-			Console.WriteLine("All is OK!");
+		static bool CheckAndUpdate(string url, string dir, RepoFileInfo f, bool checkHash = true)
+		{
+			string msg = null;
+			var r = CheckFile(dir, f, ref msg, checkHash);
+			if (r == CheckResult.OK)
+				return true;
+			if (r != CheckResult.NotExist || url == null)
+				Console.WriteLine(msg);
+			if (url == null)
+				return false;
+			Console.WriteLine("Downloading file '{0}' ...", f.Name);
+			if (r != CheckResult.NotExist)
+				File.Delete(Path.Combine(dir, f.Name));
+			if (!UpdateFile(url, dir, f.Name))
+			{
+				Console.WriteLine("Error");
+				return false;
+			}
+			r = CheckFile(dir, f, ref msg);
+			if (r != CheckResult.OK)
+			{
+				Console.WriteLine(msg);
+				return false;
+			}
 			return true;
 		}
 
-		static int CheckList(string path, string prname)
+		static bool CheckRepo(string dir, string url)
 		{
-			Console.WriteLine("Checking files...");
-			prname = Path.Combine(path, prname);
+			int badFiles = 0;
+			Console.WriteLine("Checking repository at " + dir + (Path.IsPathRooted(dir) ? "" : " (" + Path.GetFullPath(dir) + ")"));
+			if (!Directory.Exists(dir))
+			{
+				Console.WriteLine("Fatal: dir '{0}' does not exist.", dir);
+				return false;
+			}
+			dir = dir.TrimEnd('\\') + '\\';
+			if (url == "")
+				url = File.ReadLines(dir + ".url").First();
+			else if (url != null)
+			{
+				url = url.TrimEnd('/') + '/';
+				File.WriteAllText(dir + ".url", url);
+			}
+			if (url != null)
+				Console.WriteLine("Update from " + url);
+
+			string repomd = Path.Combine(dir, MainRepoFile);
+			if (!File.Exists(repomd) && url == null)
+			{
+				Console.WriteLine("Fatal: Main file '{0}' does not exist.", MainRepoFile);
+				return false;
+			}
+			if (url != null)
+				UpdateFile(url, dir, MainRepoFile);
+			XNamespace ns = "http://linux.duke.edu/metadata/repo";
+			var ff = from data in XDocument.Load(repomd).Element(ns + "repomd").Elements(ns + "data")
+					 let csum = data.Element(ns + "checksum")
+					 select new RepoFileInfo()
+					 {
+						 Type = (string)data.Attribute("type"),
+						 CsumType = ((string)csum.Attribute("type")),
+						 Csum = (string)csum,
+						 Name = (string)data.Element(ns + "location").Attribute("href"),
+						 Size = (long?)data.Element(ns + "size")
+					 };
+			string prname = null;
+			foreach (var f in ff)
+			{
+				if (!CheckAndUpdate(url, dir, f))
+				{
+					badFiles++;
+					continue;
+				}
+				if (f.Type == "primary")
+				{
+					if (prname == null)
+						prname = f.Name;
+					else
+					{
+						Console.WriteLine("Error: Duplicated primary file: {0}, was {1}.", f.Name, prname);
+					}
+				}
+			}
+			if (prname == null)
+			{
+				Console.WriteLine("Fatal: Bad or absent primary filelist.");
+				return false;
+			}
+			else
+				badFiles += CheckList(url, dir, prname);
+			return badFiles == 0;
+		}
+
+		static int CheckList(string url, string dir, string prname)
+		{
+			int badFiles = 0;
+			Console.WriteLine("Checking rpm files...");
+			prname = Path.Combine(dir, prname);
 			Stream prfs = File.OpenRead(prname);
 			if (prname.EndsWith(".gz"))
 				prfs = new GZipStream(prfs, CompressionMode.Decompress);
 			XNamespace ns = "http://linux.duke.edu/metadata/common";
 			var ff = from data in XDocument.Load(prfs).Element(ns + "metadata").Elements(ns + "package")
 					 let csum = data.Element(ns + "checksum")
-					 select new
+					 select new RepoFileInfo()
 					 {
 						 Type = (string)data.Attribute("type"),
 						 CsumType = ((string)csum.Attribute("type")),
@@ -102,57 +204,18 @@ namespace CheckRepo
 						 Name = (string)data.Element(ns + "location").Attribute("href"),
 						 Size = (long?)data.Element(ns + "size").Attribute("package")
 					 };
-			var files = ff.ToArray();
-			prfs.Close();
-			//byte[] buf = new byte[BufSize];
-			//Stopwatch swf = new Stopwatch(), swh = new Stopwatch();
-			long nread = 0;
-			foreach (var f in files)
-			//Parallel.ForEach(files, f =>
+			foreach (var f in ff)
 			{
-				byte[] buf = new byte[BufSize];
-				string fname = Path.Combine(path, f.Name);
-				long fsize = (new FileInfo(fname)).Length;
-				if (f.Size.HasValue && fsize != f.Size)
-					throw new ApplicationException("File " + fname + ": size mismatch");
-				string hType = f.CsumType.ToUpper();
-				//HashAlgorithm hAlg;
-				//if (!algs.TryGetValue(hType, out hAlg))
-				//	algs[hType] = hAlg = HashAlgorithm.Create(hType);
-				//hAlg.Initialize();
-				HashAlgorithm hAlg = HashAlgorithm.Create(hType);
-				string hash;
-				using (var fs = new FileStream(fname, FileMode.Open, FileAccess.Read, FileShare.Read, 1))
+				if (!CheckAndUpdate(url, dir, f))
+					badFiles++;
+				else if (f.Type != "rpm")
 				{
-					int nr;
-					//swf.Start();
-					
-					while ((nr = fs.Read(buf, 0, buf.Length)) > 0)
-					{
-						//swf.Stop();
-						Interlocked.Add(ref nread, nr);
-						//nread += nr;
-						//swh.Start();
-						hAlg.TransformBlock(buf, 0, nr, null, 0);
-						//swh.Stop();
-						//swf.Start();
-					}
-					//swf.Stop();
-					hAlg.TransformFinalBlock(buf, 0, 0);
-					hash = String.Join("", hAlg.Hash.Select(b => b.ToString("x2")));
-					
-					//hash = String.Join("", hAlg.ComputeHash(fs).Select(b => b.ToString("x2")));
+					Console.WriteLine("Error: File '{0}' is not an RPM.", f.Name);
+					badFiles++;
 				}
-				hAlg.Dispose();
-				if (f.Csum.ToLower() != hash)
-					throw new ApplicationException("File " + fname + ": hash mismatch");
 			}
-			Trace.Assert(files.All(f => f.Type == "rpm"));
-			double dnr = nread / (double)(1 << 20);
-			Console.WriteLine("Processed {0} files, {1:F3} MB", files.Length, dnr);
-			//Console.WriteLine("Reading: {0:F3} s, {1:F2} MB/s", swf.Elapsed.TotalSeconds, dnr / swf.Elapsed.TotalSeconds);
-			//Console.WriteLine("Hashing: {0:F3} s, {1:F2} MB/s", swh.Elapsed.TotalSeconds, dnr / swh.Elapsed.TotalSeconds);
-			return 0;
+			prfs.Close();
+			return badFiles;
 		}
 
 		static int Main(string[] args)
@@ -173,7 +236,12 @@ namespace CheckRepo
 						repoDir = s;
 				}
 
-			return CheckRepo(repoDir, updateUrl) ? 0 : 1;
+			bool r = CheckRepo(repoDir, updateUrl);
+			if (r)
+				Console.WriteLine("The repo is OK.");
+			else
+				Console.WriteLine("Bad repo.");
+			return r ? 0 : 1;
 		}
 	}
 }
