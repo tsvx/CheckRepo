@@ -1,5 +1,6 @@
 # CheckRepo
-Verification of local RPM repos.
+Verification and update of local RPM repos.
+*For those who have to update offline linux servers:)*
 
 ## Usage:
 
@@ -26,4 +27,4 @@ After that, it outputs whenever the [updated] repository is consistent.
 If something goes wrong, the app outputs it.
 
 ### To do
-Flag `-r` to remove unnecessary files that are not referenced by this repo.
+Flag `-r` to remove unwanted files which are no longer referred to this repo.
