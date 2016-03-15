@@ -118,7 +118,7 @@ namespace CheckRepo
 			return true;
 		}
 
-		static bool CheckRepo(string dir, string url, bool checkHash)
+		static bool CheckRepo(string dir, string url, SortedSet<string> list, bool checkHash)
 		{
 			int badFiles = 0;
 			Console.WriteLine("Checking repository at " + dir + (Path.IsPathRooted(dir) ? "" : " (" + Path.GetFullPath(dir) + ")"));
@@ -127,7 +127,7 @@ namespace CheckRepo
 				Console.WriteLine("Fatal: dir '{0}' does not exist.", dir);
 				return false;
 			}
-			dir = dir.TrimEnd('\\') + '\\';
+			dir = dir.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 			if (url == "")
 				url = File.ReadLines(dir + ".url").First();
 			else if (url != null)
@@ -137,7 +137,11 @@ namespace CheckRepo
 			}
 			if (url != null)
 				Console.WriteLine("Update from " + url);
-
+			if (list != null)
+			{
+				list.Add(".url");
+				list.Add(MainRepoFile);
+			}
 			string repomd = Path.Combine(dir, MainRepoFile);
 			if (!File.Exists(repomd) && url == null)
 			{
@@ -151,6 +155,8 @@ namespace CheckRepo
 					var bak = repomd + ".bak";
 					File.Delete(bak);
 					File.Move(repomd, bak);
+					if (list != null)
+						list.Add(MainRepoFile + ".bak");
 				}
 				UpdateFile(url, dir, MainRepoFile);
 			}
@@ -168,6 +174,8 @@ namespace CheckRepo
 			string prname = null;
 			foreach (var f in ff)
 			{
+				if (list != null)
+					list.Add(f.Name);
 				if (!CheckAndUpdate(url, dir, f, checkHash))
 				{
 					badFiles++;
@@ -189,11 +197,11 @@ namespace CheckRepo
 				return false;
 			}
 			else
-				badFiles += CheckList(url, dir, prname, checkHash);
+				badFiles += CheckList(url, dir, prname, list, checkHash);
 			return badFiles == 0;
 		}
 
-		static int CheckList(string url, string dir, string prname, bool checkHash = true)
+		static int CheckList(string url, string dir, string prname, SortedSet<string> list, bool checkHash)
 		{
 			int badFiles = 0;
 			Console.WriteLine("Checking rpm files...");
@@ -214,6 +222,8 @@ namespace CheckRepo
 					 };
 			foreach (var f in ff)
 			{
+				if (list != null)
+					list.Add(f.Name);
 				if (!CheckAndUpdate(url, dir, f, checkHash))
 					badFiles++;
 				else if (f.Type != "rpm")
@@ -230,10 +240,13 @@ namespace CheckRepo
 		{
 			string repoDir = null;
 			string updateUrl = null;
+			SortedSet<string> filesList = null; 
 			bool checkHash = false;
 
 			foreach (var s in args)
 			{
+				if (s == "-r")
+					filesList = new SortedSet<string>();
 				if (s == "-c")
 					checkHash = true;
 				else if (s == "-u")
@@ -246,7 +259,7 @@ namespace CheckRepo
 			if (repoDir == null)
 				repoDir = ".";
 
-			bool r = CheckRepo(repoDir, updateUrl, checkHash);
+			bool r = CheckRepo(repoDir, updateUrl, filesList, checkHash);
 			if (r)
 				Console.WriteLine("The repo is OK.");
 			else
