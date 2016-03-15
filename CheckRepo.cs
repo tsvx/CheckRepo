@@ -145,7 +145,15 @@ namespace CheckRepo
 				return false;
 			}
 			if (url != null)
+			{
+				if (File.Exists(repomd))
+				{
+					var bak = repomd + ".bak";
+					File.Delete(bak);
+					File.Move(repomd, bak);
+				}
 				UpdateFile(url, dir, MainRepoFile);
+			}
 			XNamespace ns = "http://linux.duke.edu/metadata/repo";
 			var ff = from data in XDocument.Load(repomd).Element(ns + "repomd").Elements(ns + "data")
 					 let csum = data.Element(ns + "checksum")
