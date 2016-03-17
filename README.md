@@ -4,13 +4,13 @@ Verification and update of local RPM repos.
 
 ## Annotation
 
-I serve some offline linux servers and want to keep them up to date. For this reason I use rsync to get fresh repositories.
+I maintain some offline linux servers and want to keep them up to date. For this reason I use rsync to get fresh repositories.
 Sometimes rsync gives bad results. Even if it seems that everithing is OK. So I need a tool to check an offline mirror of a repo.
 
 Besides, some small repos do not support rsync (mono-opt repos, for instance), only http.
-So I need a tool to sync them over http.
+So I need a tool to sync them over http(s).
 
-Here such a tool.
+Here is such a tool.
 
 ## Usage:
 
