@@ -23,7 +23,7 @@ in the dir to be checked. Or is read from this file if it is not given.
 4. Remove redundant files, if the flag `-r` is given and the repo is OK.
 
 The update process tries to download `repomd.xml` (always) and each file referenced
-that is absent or having a wrong size or checksum (if the latter is supposed to verify).
+that is absent or having a wrong size or checksum (if the latter is supposed to verify). The downloading supports resume.
 
 ## Workflow
 
