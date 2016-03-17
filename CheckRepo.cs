@@ -263,14 +263,19 @@ namespace CheckRepo
 		{
 			string repoDir = null;
 			string updateUrl = null;
-			SortedSet<string> filesList = new SortedSet<string>();
+			SortedSet<string> filesList = null;
 			bool deleteExcess = false;
 			bool checkHash = false;
 
 			foreach (var s in args)
 			{
 				if (s == "-r")
+					filesList = new SortedSet<string>();
+				else if (s == "-rr")
+				{
+					filesList = new SortedSet<string>();
 					deleteExcess = true;
+				}
 				else if (s == "-c")
 					checkHash = true;
 				else if (s == "-u")
