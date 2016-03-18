@@ -40,4 +40,5 @@ After that, it outputs whenever the [updated] repository is consistent.
 If something goes wrong, the app outputs it.
 
 ### To do
-Remove empty dirs in remove mode (`-r`).
+* Remove empty dirs in remove mode (`-r`).
+* Show progress (files left to check; file check/download speed, estimate time).
