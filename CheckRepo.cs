@@ -236,12 +236,12 @@ namespace CheckRepo
 			return badFiles;
 		}
 
-		static void ShowExcess(string dir, SortedSet<string> keepFiles, bool deleteExcess)
+		static void ShowExcess(string dir, SortedSet<string> keepFiles, bool deleteExcess, bool caseSensitive)
 		{
 			var allFiles = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories);
 			if (Path.AltDirectorySeparatorChar != Path.DirectorySeparatorChar)
 				allFiles = allFiles.Select(s => s.Replace(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-			var toDel = new SortedSet<string>(allFiles);
+			var toDel = new SortedSet<string>(allFiles, caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
 			toDel.ExceptWith(keepFiles);
 			if (toDel.Count > 0)
 				Console.WriteLine("Excess files:");
@@ -263,23 +263,25 @@ namespace CheckRepo
 		{
 			string repoDir = null;
 			string updateUrl = null;
-			SortedSet<string> filesList = null;
+			bool checkExcess = false;
 			bool deleteExcess = false;
 			bool checkHash = false;
+			bool caseSensitive = false;
+			
+			SortedSet<string> filesList = null;
 
 			foreach (var s in args)
 			{
 				if (s == "-r")
-					filesList = new SortedSet<string>();
+					checkExcess = true;
 				else if (s == "-rr")
-				{
-					filesList = new SortedSet<string>();
-					deleteExcess = true;
-				}
+					checkExcess = deleteExcess = true;
 				else if (s == "-c")
 					checkHash = true;
 				else if (s == "-u")
 					updateUrl = "";
+				else if (s == "-s")
+					caseSensitive = true;
 				else if (updateUrl == "")
 					updateUrl = s;
 				else if (Directory.Exists(s))
@@ -290,6 +292,9 @@ namespace CheckRepo
 					return 1;
 				}
 			}
+			if (checkExcess)
+				filesList = new SortedSet<string>(caseSensitive ? StringComparer.Ordinal : StringComparer.OrdinalIgnoreCase);
+
 			if (repoDir == null)
 				repoDir = ".";
 
@@ -302,7 +307,7 @@ namespace CheckRepo
 			{
 				Console.WriteLine("The repo is OK.");
 				if (filesList != null)
-					ShowExcess(repoDir, filesList, deleteExcess);
+					ShowExcess(repoDir, filesList, deleteExcess, caseSensitive);
 			}
 			else
 				Console.WriteLine("Bad repo.");

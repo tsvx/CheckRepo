@@ -14,7 +14,7 @@ Here is such a tool.
 
 ## Usage:
 
-`CheckRepo [dir] [-c] [-r[r]] [-u [url]]`
+`CheckRepo [dir] [-c] [-s] [-r[r]] [-u [url]]`
 
 1. Checks a repo in the given or in the current directory;
 2. Checksum verification is performed only if the flag `-c` is specified.
@@ -22,6 +22,8 @@ Here is such a tool.
 in the dir to be checked. Or is read from this file if it is not given.
 4. Show redundant files, if the flag `-r` is given and the repo is OK.
 5. Remove redundant files, if the flag `-rr` is given and the repo is OK.
+
+The processing of redundant files is case-insensitive unless the flag `-s` is given.
 
 The update process tries to download `repomd.xml` (always) and each file referenced
 that is absent or having a wrong size or checksum (if the latter is supposed to verify). The downloading supports resume.
